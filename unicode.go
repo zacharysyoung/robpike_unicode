@@ -55,7 +55,7 @@ func main() {
 	var codes []rune
 	switch {
 	case *doGrep:
-		codes = argsAreRegexps()
+		codes = argsAreRegexps(flag.Args())
 	case *doChar:
 		codes = argsAreNumbers()
 	case *doNum:
@@ -201,9 +201,11 @@ func argsAreNumbers() []rune {
 	return codes
 }
 
-func argsAreRegexps() []rune {
+// argsAreRegexps matches the regexps in args against the combined
+// value of "{Codepoint}\t{Name}; {Unicode 1.0 Name}".
+func argsAreRegexps(args []string) []rune {
 	var codes []rune
-	for _, a := range flag.Args() {
+	for _, a := range args {
 		re, err := regexp.Compile(a)
 		if err != nil {
 			fatalf("%s", err)
@@ -213,6 +215,9 @@ func argsAreRegexps() []rune {
 			line = fields[0] + "\t" + fields[1]
 			if fields[10] != "" {
 				line += "; " + fields[10]
+			}
+			if strings.Contains(line, "greek small letter") {
+				fmt.Printf("debug: %q\n", line)
 			}
 			if re.MatchString(line) {
 				r, _ := runeOfLine(i, line)
@@ -266,6 +271,8 @@ func desc(codes []rune) {
 	}
 }
 
+// See <https://www.unicode.org/reports/tr44/#UnicodeData.txt>
+// for field definitions.
 var prop = [...]string{
 	"",
 	"category: ",
