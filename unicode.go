@@ -13,6 +13,7 @@ usage: unicode [-c] [-d] [-n] [-t]
 	-d: output textual description
 	-t: output plain text, not one char per line
 	-U: output full Unicode description
+	-s: sort before output (only useful with -g and multiple regexps)
 
 Default behavior sniffs the arguments to select -c vs. -n.
 */
@@ -25,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -37,6 +39,7 @@ var (
 	doUnic = flag.Bool("u", false, "describe the characters from the Unicode database, in Unicode form")
 	doUNIC = flag.Bool("U", false, "describe the characters from the Unicode database, in glorious detail")
 	doGrep = flag.Bool("g", false, "grep for argument string in data")
+	doSort = flag.Bool("s", false, "sort characters before outputting/describing")
 )
 
 var printRange = false
@@ -60,6 +63,10 @@ func main() {
 		codes = argsAreNumbers()
 	case *doNum:
 		codes = argsAreChars()
+	}
+	codes = dedupe(codes)
+	if *doSort {
+		sort.Slice(codes, func(i, j int) bool { return codes[i] < codes[j] })
 	}
 	if *doUnic || *doUNIC || *doDesc {
 		desc(codes)
@@ -106,6 +113,7 @@ const usageText = `usage: unicode [-c] [-d] [-n] [-t]
 -d: output textual description
 -t: output plain text, not one char per line
 -U: output full Unicode description
+-s: sort before output (only useful with -g and multiple regexps)
 
 Default behavior sniffs the arguments to select -c vs. -n.
 `
@@ -264,6 +272,22 @@ func desc(codes []rune) {
 			fmt.Printf("%#U %s\n", r, desc)
 		}
 	}
+}
+
+// dedupe returns codes with duplicate runes removed. It preserves
+// the original order of the remaining runes.
+func dedupe(codes []rune) []rune {
+	var (
+		deduped = make([]rune, 0)
+		m       = make(map[rune]bool)
+	)
+	for _, r := range codes {
+		if !m[r] {
+			deduped = append(deduped, r)
+			m[r] = true
+		}
+	}
+	return deduped
 }
 
 var prop = [...]string{
