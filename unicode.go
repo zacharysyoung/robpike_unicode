@@ -15,6 +15,11 @@ usage: unicode [-c] [-d] [-n] [-t]
 	-U: output full Unicode description
 
 Default behavior sniffs the arguments to select -c vs. -n.
+
+For -g, regexps are compared against a string composed of the
+fields "{Codepoint}\t{Name}[; {Unicode 1.0 Name}]" (square
+brackets denote an optional extension, delimited with ";", if the
+entry has an obsolete 1.0 name).
 */
 package main // import "robpike.io/cmd/unicode"
 
