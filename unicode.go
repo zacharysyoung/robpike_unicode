@@ -13,6 +13,7 @@ usage: unicode [-c] [-d] [-n] [-t]
 	-d: output textual description
 	-t: output plain text, not one char per line
 	-U: output full Unicode description
+	-s: sort before output (only useful with -g and multiple regexps)
 
 Default behavior sniffs the arguments to select -c vs. -n.
 */
@@ -25,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -36,6 +38,7 @@ var (
 	doDesc = flag.Bool("d", false, "describe the characters from the Unicode database, in simple form")
 	doUnic = flag.Bool("u", false, "describe the characters from the Unicode database, in Unicode form")
 	doUNIC = flag.Bool("U", false, "describe the characters from the Unicode database, in glorious detail")
+	doSort = flag.Bool("s", false, "sort characters before outputting/describing")
 	doGrep = flag.Bool("g", false, "grep for argument string in data")
 )
 
@@ -60,6 +63,9 @@ func main() {
 		codes = argsAreNumbers()
 	case *doNum:
 		codes = argsAreChars()
+	}
+	if *doSort {
+		sort.Slice(codes, func(i, j int) bool { return codes[i] < codes[j] })
 	}
 	if *doUnic || *doUNIC || *doDesc {
 		desc(codes)
