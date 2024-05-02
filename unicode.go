@@ -9,13 +9,22 @@ usage: unicode [-c] [-d] [-n] [-t]
 
 	-c: args are hex; output characters (xyz)
 	-n: args are characters; output hex (23 or 23-44)
-	-g: args are regular expressions for matching names
+	-g: args are regular expressions for matching names (see note below)
 	-d: output textual description
 	-t: output plain text, not one char per line
 	-U: output full Unicode description
 	-s: sort before output (only useful with -g and multiple regexps)
 
 Default behavior sniffs the arguments to select -c vs. -n.
+
+For -g, regexps are matched against a search-string composed of
+the Name and Unicode 1.0 Name fields. The search-string has the
+form '{Name};{Unicode 1.0 Name}', and has only one semicolon
+between Name and Unicode 1.0 Name. Even if the search-string does
+not have a Unicode 1.0 Name, it will have the semicolon followed
+by the empty string (as a placeholder). This allows for querys
+to single-out Name or 1.0 Name, e.g., '^regexp1;' to fully match
+Name, or ';regexp2' to match just the start of a 1.0 Name.
 */
 package main // import "robpike.io/cmd/unicode"
 
@@ -62,7 +71,7 @@ func main() {
 	var codes []rune
 	switch {
 	case *doGrep:
-		codes = argsAreRegexps(flag.Args())
+		codes = argsAreRegexps()
 	case *doChar:
 		codes = argsAreNumbers()
 	case *doNum:
@@ -111,15 +120,25 @@ func fatalf(format string, args ...interface{}) {
 }
 
 const usageText = `usage: unicode [-c] [-d] [-n] [-t]
+
 -c: args are hex; output characters (xyz)
 -n: args are characters; output hex (23 or 23-44)
--g: args are regular expressions for matching names
+-g: args are regular expressions for matching names (see note below)
 -d: output textual description
 -t: output plain text, not one char per line
 -U: output full Unicode description
 -s: sort before output (only useful with -g and multiple regexps)
 
 Default behavior sniffs the arguments to select -c vs. -n.
+
+For -g, regexps are matched against a search-string composed of
+the Name and Unicode 1.0 Name fields. The search-string has the
+form '{Name};{Unicode 1.0 Name}', and has only one semicolon
+between Name and Unicode 1.0 Name. Even if the search-string does
+not have a Unicode 1.0 Name, it will have the semicolon followed
+by the empty string (as a placeholder). This allows for querys
+to single-out Name or 1.0 Name, e.g., '^regexp1;' to fully match
+Name, or ';regexp2' to match just the start of a 1.0 Name.
 `
 
 func usage() {
@@ -213,27 +232,26 @@ func argsAreNumbers() []rune {
 	return codes
 }
 
-// argsAreRegexps matches the regexps in args against the combined
-// value of "{Codepoint}\t{Name}; {Unicode 1.0 Name}".
-func argsAreRegexps(args []string) []rune {
+// argsAreRegexps returns runes for search-strings that match some
+// number of user-supplied regexps.
+//
+// A search-string is composed of a Name and (optionally) Unicode
+// 1.0 Name, in the form, '{Name};{Unicode 1.0 Name}'; it has only
+// one semicolon, between Name and Unicode 1.0 Name. Even if a
+// search-string doesn't have a 1.0 Name, it will have the semicolon
+// followed by the empty string, '{Name};'.
+func argsAreRegexps() []rune {
 	var codes []rune
-	for _, a := range args {
+	for _, a := range flag.Args() {
 		re, err := regexp.Compile(a)
 		if err != nil {
 			fatalf("%s", err)
 		}
-		for i, line := range unicodeLines {
+		for _, line := range unicodeLines {
 			fields := strings.Split(strings.ToLower(line), ";")
-			line = fields[0] + "\t" + fields[1]
-			if fields[10] != "" {
-				line += "; " + fields[10]
-			}
-			if strings.Contains(line, "greek small letter") {
-				fmt.Printf("debug: %q\n", line)
-			}
+			line = fields[1] + ";" + fields[10]
 			if re.MatchString(line) {
-				r, _ := runeOfLine(i, line)
-				codes = append(codes, r)
+				codes = append(codes, parseRune(fields[0]))
 			}
 		}
 	}
