@@ -14,6 +14,7 @@ usage: unicode [-c] [-d] [-n] [-t]
 	-t: output plain text, not one char per line
 	-U: output full Unicode description
 	-s: sort before output (only useful with -g and multiple regexps)
+	-v: print version and exit
 
 Default behavior sniffs the arguments to select -c vs. -n.
 
@@ -35,20 +36,22 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
 )
 
 var (
-	doNum  = flag.Bool("n", false, "output numeric values")
-	doChar = flag.Bool("c", false, "output characters")
-	doText = flag.Bool("t", false, "output plain text")
-	doDesc = flag.Bool("d", false, "describe the characters from the Unicode database, in simple form")
-	doUnic = flag.Bool("u", false, "describe the characters from the Unicode database, in Unicode form")
-	doUNIC = flag.Bool("U", false, "describe the characters from the Unicode database, in glorious detail")
-	doGrep = flag.Bool("g", false, "grep for argument string in data")
-	doSort = flag.Bool("s", false, "sort characters before outputting/describing")
+	doNum   = flag.Bool("n", false, "output numeric values")
+	doChar  = flag.Bool("c", false, "output characters")
+	doText  = flag.Bool("t", false, "output plain text")
+	doDesc  = flag.Bool("d", false, "describe the characters from the Unicode database, in simple form")
+	doUnic  = flag.Bool("u", false, "describe the characters from the Unicode database, in Unicode form")
+	doUNIC  = flag.Bool("U", false, "describe the characters from the Unicode database, in glorious detail")
+	doGrep  = flag.Bool("g", false, "grep for argument string in data")
+	doSort  = flag.Bool("s", false, "sort characters before outputting/describing")
+	verFlag = flag.Bool("v", false, "print version and exit")
 )
 
 var printRange = false
@@ -73,6 +76,9 @@ var (
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+	if *verFlag {
+		printVersion()
+	}
 	mode()
 	var codes []rune
 	switch {
@@ -134,6 +140,7 @@ const usageText = `usage: unicode [-c] [-d] [-n] [-t]
 -t: output plain text, not one char per line
 -U: output full Unicode description
 -s: sort before output (only useful with -g and multiple regexps)
+-v: print version and exit
 
 Default behavior sniffs the arguments to select -c vs. -n.
 
@@ -352,4 +359,19 @@ func dumpUnicode(line string) []byte {
 		fmt.Fprintf(b, "%s%s\n", prop[i], f)
 	}
 	return b.Bytes()
+}
+
+func printVersion() {
+	s := "unicode2"
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		for _, x := range bi.Settings {
+			if x.Key == "vcs.revision" {
+				s += ":" + x.Value[:7] // short hash
+				break
+			}
+		}
+		s += ":" + bi.GoVersion
+	}
+	fmt.Fprintln(os.Stderr, s)
+	os.Exit(2)
 }
