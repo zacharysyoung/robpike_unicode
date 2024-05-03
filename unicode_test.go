@@ -29,7 +29,6 @@ func TestMain(t *testing.T) {
 			args  = string(a.Files[i].Data)
 			want  = string(a.Files[i+1].Data)
 		)
-		args = strings.TrimSpace(args) // trim trailing newline so it won't be interpreted
 
 		t.Run(tname, func(t *testing.T) {
 			// Reset package main
@@ -54,7 +53,7 @@ func TestMain(t *testing.T) {
 
 			r, w, _ := os.Pipe()
 			os.Stdout = w
-			os.Args = append([]string{"prog"}, strings.Split(args, " ")...)
+			os.Args = append([]string{"prog"}, strings.Fields(args)...)
 			go func() {
 				main()
 				w.Close()
