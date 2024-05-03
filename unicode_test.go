@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,10 +13,10 @@ import (
 
 var quoteFlag = flag.Bool("quote", false, "quote got and want in failures")
 
-func TestMain(t *testing.T) {
+func TestCLI(t *testing.T) {
 	flag.Parse()
 
-	a, err := txtar.ParseFile("./testdata/cli-args.txt")
+	a, err := txtar.ParseFile(filepath.Join("testdata", "cli.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}

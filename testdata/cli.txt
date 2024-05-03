@@ -1,0 +1,33 @@
+-- codepoint for char "A" --
+-n A
+-- want --
+0041
+-- char for codepoint 'A' --
+-c 0041
+-- want --
+A
+-- plain-text char "A" --
+-t -n A
+-- want --
+A
+-- describe char "A" --
+-d -n A
+-- want --
+U+0041 'A' latin capital letter a
+-- describe codepoint (000)A --
+-d -c A
+-- want --
+U+000A <control>; line feed (lf)
+-- Unicode char "A" --
+-u -n A
+-- want --
+U+0041 'A' LATIN CAPITAL LETTER A;Lu;0;L;;;;;N;;;;0061;
+-- UNICODE char "A" --
+-U -n A
+-- want --
+U+0041 'A' LATIN CAPITAL LETTER A
+	category: Lu
+	canonical combining classes: 0
+	bidirectional category: L
+	mirrored: N
+	lowercase mapping: 0061

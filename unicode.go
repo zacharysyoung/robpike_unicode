@@ -53,15 +53,21 @@ var (
 
 var printRange = false
 
-// See <https://www.unicode.org/reports/tr44/#UnicodeData.txt> for
-// field definitions, and <https://www.unicode.org/reports/tr44/#Data_Fields>
-// for the broader spec for this file.
+const delim = ";"
+
+// See <https://www.unicode.org/reports/tr44/#Data_Fields> for
+// the broader spec for this file.
 //
 //go:generate sh -c "curl http://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt >UnicodeData.txt"
 var (
 	//go:embed UnicodeData.txt
 	unicodeDataTxt string
-	unicodeLines   = splitLines(unicodeDataTxt)
+
+	// unicodeLines is a slice of strings of lines from UnicodeData.txt.
+	// Each line contains 15 fields separated by delim. See
+	// <https://www.unicode.org/reports/tr44/#UnicodeData.txt> for
+	// field definitions.
+	unicodeLines = splitLines(unicodeDataTxt)
 )
 
 func main() {
@@ -190,20 +196,6 @@ func argsAreChars() []rune {
 	return codes
 }
 
-func argsAreNames() []rune {
-	var codes []rune
-	for i, a := range flag.Args() {
-		for _, r := range a {
-			codes = append(codes, r)
-		}
-		// Add space between arguments if output is plain text.
-		if *doText && i < len(flag.Args())-1 {
-			codes = append(codes, ' ')
-		}
-	}
-	return codes
-}
-
 func parseRune(s string) rune {
 	r, err := strconv.ParseInt(s, 16, 22)
 	if err != nil {
@@ -260,26 +252,30 @@ func argsAreRegexps() []rune {
 
 func splitLines(text string) []string {
 	lines := strings.Split(text, "\n")
-	// We get an empty final line; drop it.
-	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
-		lines = lines[:len(lines)-1]
+	for i := len(lines) - 1; i >= 0; i-- {
+		if len(lines[i]) == 0 {
+			lines = slices.Delete(lines, i, i+1)
+			continue
+		}
+		if strings.Index(lines[i], delim) < 0 {
+			fatalf("malformed database: line %d", i+1)
+		}
 	}
 	return lines
 }
 
-func runeOfLine(i int, line string) (r rune, tab int) {
-	tab = strings.IndexAny(line, "\t;")
-	if tab < 0 {
-		fatalf("malformed database: line %d", i)
-	}
-	return parseRune(line[0:tab]), tab
+// runeOfLine returns the parsed rune and the index of its
+// trailing delimiter.
+func runeOfLine(line string) (r rune, i int) {
+	i = strings.Index(line, delim)
+	return parseRune(line[0:i]), i
 }
 
 func desc(codes []rune) {
 	runeData := make(map[rune]string)
-	for i, l := range unicodeLines {
-		r, tab := runeOfLine(i, l)
-		runeData[r] = l[tab+1:]
+	for _, l := range unicodeLines {
+		r, i := runeOfLine(l)
+		runeData[r] = l[i+1:]
 	}
 	if *doUNIC {
 		for _, r := range codes {
@@ -291,7 +287,7 @@ func desc(codes []rune) {
 		}
 	} else {
 		for _, r := range codes {
-			fields := strings.Split(strings.ToLower(runeData[r]), ";")
+			fields := strings.Split(strings.ToLower(runeData[r]), delim)
 			desc := fields[0]
 			if len(desc) >= 9 && fields[9] != "" {
 				desc += "; " + fields[9]
@@ -335,7 +331,7 @@ var prop = [...]string{
 }
 
 func dumpUnicode(s string) []byte {
-	fields := strings.Split(s, ";")
+	fields := strings.Split(s, delim)
 	if len(fields) == 0 {
 		return []byte{'\n'}
 	}
