@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -79,7 +79,7 @@ func main() {
 	}
 	codes = dedupe(codes)
 	if *doSort {
-		sort.Slice(codes, func(i, j int) bool { return codes[i] < codes[j] })
+		slices.Sort(codes)
 	}
 	if *doUnic || *doUNIC || *doDesc {
 		desc(codes)
