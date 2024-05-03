@@ -78,14 +78,14 @@ func main() {
 	switch {
 	case *doGrep:
 		codes = argsAreRegexps()
+		codes = dedupe(codes)
+		if *doSort {
+			slices.Sort(codes)
+		}
 	case *doChar:
 		codes = argsAreNumbers()
 	case *doNum:
 		codes = argsAreChars()
-	}
-	codes = dedupe(codes)
-	if *doSort {
-		slices.Sort(codes)
 	}
 	if *doUnic || *doUNIC || *doDesc {
 		desc(codes)
@@ -330,14 +330,16 @@ var prop = [...]string{
 	"titlecase mapping: ",
 }
 
-func dumpUnicode(s string) []byte {
-	fields := strings.Split(s, delim)
+// dumpUnicode prints the unicodeLine line, one printed line
+// per non-empty field in line.
+func dumpUnicode(line string) []byte {
+	fields := strings.Split(line, delim)
 	if len(fields) == 0 {
 		return []byte{'\n'}
 	}
 	b := new(bytes.Buffer)
 	if len(fields) != len(prop) {
-		fmt.Fprintf(b, "%s: can't print: expected %d fields, got %d\n", s, len(prop), len(fields))
+		fmt.Fprintf(b, "%s: can't print: expected %d fields, got %d\n", line, len(prop), len(fields))
 		return b.Bytes()
 	}
 	for i, f := range fields {

@@ -31,3 +31,7 @@ U+0041 'A' LATIN CAPITAL LETTER A
 	bidirectional category: L
 	mirrored: N
 	lowercase mapping: 0061
+-- multiple char groups print w/intermediate spaces --
+-t -n ab  cd    efgh
+-- want --
+ab cd efgh
