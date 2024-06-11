@@ -5,16 +5,17 @@
 /*
 Unicode is a command-line tool for studying Unicode characters.
 
-usage: unicode [-c] [-d] [-n] [-t]
+usage: unicode [-c | -n | -g [-s] | -8] [-d | -t | -u | -U] args...
 
-	-c: args are hex; output characters (xyz)
-	-n: args are characters; output hex (23 or 23-44)
-	-g: args are regular expressions for matching names (see note below)
-	-d: output textual description
-	-t: output plain text, not one char per line
-	-U: output full Unicode description
-	-s: sort before output (only useful with -g and multiple regexps)
-	-v: print version and exit
+-c: args are hex; output characters (xyz)
+-n: args are characters; output hex (23 or 23-44)
+-g: args are regular expressions for matching names (see note below)
+-8: args are sequences of valid UTF-8, e.g., '\xe2\x80\xaf', or just e280af
+-d: output textual description
+-t: output plain text, not one char per line
+-U: output full Unicode description
+-s: sort before output (only useful with -g and multiple regexps)
+-v: print version and exit
 
 Default behavior sniffs the arguments to select -c vs. -n.
 
@@ -32,6 +33,7 @@ package main // import "robpike.io/cmd/unicode"
 import (
 	"bytes"
 	_ "embed"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -42,16 +44,46 @@ import (
 	"strings"
 )
 
+const usageText = `usage: unicode [-c | -n | -g [-s] | -8] [-d | -t | -u | -U] args...
+
+-c: args are hex; output characters (xyz)
+-n: args are characters; output hex (23 or 23-44)
+-g: args are regular expressions for matching names (see note below)
+-8: args are sequences of valid UTF-8, e.g., '\xe2\x80\xaf', or just e280af
+-d: output textual description
+-t: output plain text, not one char per line
+-u: output short Unicode description
+-U: output full Unicode description
+-s: sort before output (only useful with -g and multiple regexps)
+-v: print version and exit
+
+Default behavior sniffs the arguments to select -c vs. -n.
+
+For -g, regexps are matched against a search-string composed of
+the Name and Unicode 1.0 Name fields. The search-string has the
+form '{Name};{Unicode 1.0 Name}', and has only one semicolon
+between Name and Unicode 1.0 Name. Even if the search-string does
+not have a Unicode 1.0 Name, it will have the semicolon followed
+by the empty string (as a placeholder). This allows for querys
+to single-out Name or 1.0 Name, e.g., '^regexp1;' to fully match
+Name, or ';regexp2' to match just the start of a 1.0 Name.
+`
+
+// Intentionally leaving descriptions blank because of usage string
+// override, above.
+
 var (
-	doNum   = flag.Bool("n", false, "output numeric values")
-	doChar  = flag.Bool("c", false, "output characters")
-	doText  = flag.Bool("t", false, "output plain text")
-	doDesc  = flag.Bool("d", false, "describe the characters from the Unicode database, in simple form")
-	doUnic  = flag.Bool("u", false, "describe the characters from the Unicode database, in Unicode form")
-	doUNIC  = flag.Bool("U", false, "describe the characters from the Unicode database, in glorious detail")
-	doGrep  = flag.Bool("g", false, "grep for argument string in data")
-	doSort  = flag.Bool("s", false, "sort characters before outputting/describing")
-	verFlag = flag.Bool("v", false, "print version and exit")
+	doChar = flag.Bool("c", false, "")
+	doNum  = flag.Bool("n", false, "")
+	doGrep = flag.Bool("g", false, "")
+	doUTF8 = flag.Bool("8", false, "")
+
+	doText  = flag.Bool("t", false, "")
+	doDesc  = flag.Bool("d", false, "")
+	doUnic  = flag.Bool("u", false, "")
+	doUNIC  = flag.Bool("U", false, "")
+	doSort  = flag.Bool("s", false, "")
+	verFlag = flag.Bool("v", false, "")
 )
 
 var printRange = false
@@ -92,6 +124,8 @@ func main() {
 		codes = argsAreNumbers()
 	case *doNum:
 		codes = argsAreChars()
+	case *doUTF8:
+		codes = argsAreUTF8()
 	}
 	if *doUnic || *doUNIC || *doDesc {
 		desc(codes)
@@ -131,29 +165,6 @@ func fatalf(format string, args ...interface{}) {
 	os.Exit(2)
 }
 
-const usageText = `usage: unicode [-c] [-d] [-n] [-t]
-
--c: args are hex; output characters (xyz)
--n: args are characters; output hex (23 or 23-44)
--g: args are regular expressions for matching names (see note below)
--d: output textual description
--t: output plain text, not one char per line
--U: output full Unicode description
--s: sort before output (only useful with -g and multiple regexps)
--v: print version and exit
-
-Default behavior sniffs the arguments to select -c vs. -n.
-
-For -g, regexps are matched against a search-string composed of
-the Name and Unicode 1.0 Name fields. The search-string has the
-form '{Name};{Unicode 1.0 Name}', and has only one semicolon
-between Name and Unicode 1.0 Name. Even if the search-string does
-not have a Unicode 1.0 Name, it will have the semicolon followed
-by the empty string (as a placeholder). This allows for querys
-to single-out Name or 1.0 Name, e.g., '^regexp1;' to fully match
-Name, or ';regexp2' to match just the start of a 1.0 Name.
-`
-
 func usage() {
 	fatalf("%s", usageText)
 }
@@ -165,10 +176,10 @@ func mode() {
 		usage()
 	}
 	// If grepping names, we need an output format defined; default is numeric.
-	if *doGrep && !(*doNum || *doChar || *doDesc || *doUnic || *doUNIC) {
+	if *doGrep && !(*doNum || *doChar || *doUTF8 || *doDesc || *doUnic || *doUNIC) {
 		*doNum = true
 	}
-	if *doNum || *doChar {
+	if *doNum || *doChar || *doUTF8 {
 		return
 	}
 	alldigits := true
@@ -227,6 +238,20 @@ func argsAreNumbers() []rune {
 			continue
 		}
 		codes = append(codes, parseRune(a))
+	}
+	return codes
+}
+
+func argsAreUTF8() []rune {
+	var codes []rune
+	for _, a := range flag.Args() {
+		s := strings.ReplaceAll(a, "\\x", "")
+		p, err := hex.DecodeString(s)
+		if err != nil {
+			fatalf("%s", err)
+		}
+		s = string(p)
+		codes = append(codes, []rune(s)...)
 	}
 	return codes
 }
